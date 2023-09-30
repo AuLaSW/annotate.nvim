@@ -18,16 +18,24 @@ local wrapMaybe = function (value)
 end
 
 -- @param obj: table we are testing the existence of 
---             var against
+--             var against.
 --
 -- @param var: string, name of obj parameter we are 
---             testing the existence of
+--             testing the existence of.
 --
--- @param val: value of var parameter if it does not 
---             exist
+-- @param val: callable that returns a value.
+--             Callability is optional; if it is not
+--             callable, then the value is wrapped
+--             in a function automatically.
 local existing = function (obj, var, val)
+    if not pcall(val) then
+        val = function()
+            return val
+        end
+    end
+
     if not obj[var] or obj[var].empty then
-        obj[var] = wrapMaybe(val)
+        obj[var] = wrapMaybe(val())
     end
     print(obj[var].value)
 end
@@ -43,7 +51,10 @@ end
 --
 -- Nothing
 M.create_namespace = function (name)
-    local space = vim.api.nvim_create_namespace(name)
+    local space = function()
+            return vim.api.nvim_create_namespace(name)
+        end
+
     existing(M, 'ns', space)
 end
 
