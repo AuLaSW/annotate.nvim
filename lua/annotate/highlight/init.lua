@@ -43,7 +43,8 @@ end
 --
 -- Nothing
 M.create_namespace = function (name)
-   existing(M, 'ns', name)
+    local space = vim.api.nvim_create_namespace(name)
+    existing(M, 'ns', space)
 end
 
 -- Create an extmark id for the highlight module. Sets the value into M.ext
@@ -57,7 +58,7 @@ end
 --
 -- Nothing
 M.create_extmark_id = function (id)
-   existing(M, 'ext', id)
+    existing(M, 'ext', id)
 end
 
 
