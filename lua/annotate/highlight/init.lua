@@ -11,6 +11,7 @@ local wrapMaybe = function (value)
         T.empty = true
     else
         T.value = value
+        T.empty = false
     end
 
     return T
@@ -28,6 +29,7 @@ local existing = function (obj, var, val)
     if not obj[var] or obj[var].empty then
         obj[var] = wrapMaybe(val)
     end
+    print(obj[var].value)
 end
 
 -- Create a namespace for the highlight module. Sets the value into M.ns
