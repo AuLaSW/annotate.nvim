@@ -1,11 +1,10 @@
-
 if not ns
 then
     ns = vim.api.nvim_create_namespace('')
 end
 extid = 0
 
-function get_tree()
+    function get_tree()
     local tree = vim.treesitter.get_parser(bufnr, lang):parse()[1]:root()
     print(tree)
     return tree
