@@ -1,4 +1,5 @@
 local M = {}
+local test = true
 
 -- @param value: any
 local wrapMaybe = function (value)
@@ -37,7 +38,6 @@ local existing = function (obj, var, val)
     if not obj[var] or obj[var].empty then
         obj[var] = wrapMaybe(val())
     end
-    print(obj[var].value)
 end
 
 -- Create a namespace for the highlight module. Sets the value into M.ns
@@ -74,28 +74,26 @@ end
 
 
 M.set_hl = function(range)
+    M.create_namespace('annotate')
     local bufnr = vim.api.nvim_get_current_buf()
 
-    M.create_namespace('annotate')
-
-    id = vim.api.nvim_buf_set_extmark(
+    local id = vim.api.nvim_buf_set_extmark(
             bufnr,
             M.ns.value,
             range.start.row,
-            range.start.column,
+            range.start.col,
             {
                 end_row=range.stop.row,
-                end_col=range.stop.column,
+                end_col=range.stop.col,
                 hl_group='@annotate'
             }
         )
 
-    print(vim.inspect(id))
-
     M.create_extmark_id(id)
 end
 
-M.get_hl_id = function ()
+M.get_hl_extmarks = function ()
+    M.create_namespace('annotate')
     local bufnr = vim.api.nvim_get_current_buf()
     -- get the cursor position
     local pos = {
@@ -104,7 +102,7 @@ M.get_hl_id = function ()
     }
 
     -- get the first extmark id that comes after the cursor
-    id = vim.api.nvim_buf_get_extmarks(
+    local ext_id = vim.api.nvim_buf_get_extmarks(
         bufnr,
         M.ns.value,
         pos,
@@ -118,11 +116,11 @@ M.get_hl_id = function ()
     -- check that the id ends after the cursor
     -- if it is, then return it
     -- otherwise, return nil
-    if id[4].end_row > pos[1] or (
-            id[4].end_row == pos[1] and
-            id[4].end_col >= pos[2]
+    if ext_id[4].end_row > pos[1] or (
+            ext_id[4].end_row == pos[1] and
+            ext_id[4].end_col >= pos[2]
     ) then
-            return id
+            return ext_id
     end
 
     return nil
@@ -131,42 +129,35 @@ end
 M.del_hl_id = function (id)
     local bufnr = vim.api.nvim_get_current_buf()
 
+    print(bufnr, M.ns.value, id)
     vim.api.nvim_buf_del_extmark(
         bufnr,
-        M.ns,
+        M.ns.value,
         id
     )
 
-    M.ext[id] = nil
+    M.ext = nil
 end
 
-M.del_hl_range = function (range)
-    local bufnr = vim.api.nvim_get_current_buf()
-
-    ids = vim.api.nvim_buf_get_extmarks(
-        bufnr,
-        M.ns,
-        range.start,
-        range.stop,
-        {}
-    )
-
-    for _, exm in pairs(ids) do
-        M.del_hl_id(exm[1])
-    end
-end
-
-
--- The setup function for the highlight module. Accepts:
---
--- ## Arguments:
---
--- {opts}: (table|nil) optional arguments for setup.
---
--- ## Returns:
---
--- None
 M.setup = function (opts)
+end
+
+if test then
+    M.set_hl({
+        start = {
+            row = 0,
+            col = 0
+        },
+        stop = {
+            row = 2,
+            col = 0
+        }
+    })
+
+    local id = M.get_hl_extmarks()
+    print(id)
+
+    M.del_hl_id(id[1])
 end
 
 return M
