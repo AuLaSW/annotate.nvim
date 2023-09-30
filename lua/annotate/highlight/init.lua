@@ -66,7 +66,7 @@ M.set_hl = function(range)
 
     id = vim.api.nvim_buf_set_extmark(
             bufnr,
-            M.ns,
+            M.ns.value,
             range.start.row,
             range.start.column,
             {
