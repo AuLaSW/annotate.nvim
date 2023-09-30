@@ -81,7 +81,7 @@ M.set_hl = function(range)
 
     print(vim.inspect(id))
 
-    M.create_ext_mark_id(id)
+    M.create_extmark_id(id)
 end
 
 M.get_hl_id = function ()
