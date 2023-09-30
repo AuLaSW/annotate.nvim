@@ -1,5 +1,5 @@
 if ANNOTATE_TEST then
-    print('annotate found')
+    print('annotate#1 found')
 end
 
 if not ns

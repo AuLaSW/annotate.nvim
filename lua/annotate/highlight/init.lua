@@ -1,3 +1,6 @@
+if ANNOTATE_TEST then
+    print('highlight found')
+end
 local M = {}
 M.ext = {}
 

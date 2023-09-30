@@ -1,3 +1,3 @@
 if ANNOTATE_TEST then
-    print('annotate found')
+    print('annotate#2 found')
 end
