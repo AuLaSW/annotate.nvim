@@ -88,8 +88,8 @@ M.get_hl_id = function ()
     local bufnr = vim.api.nvim_get_current_buf()
     -- get the cursor position
     local pos = {
-        vim.api.nvim_win_get_cursor(bufnr)[1] - 1,
-        vim.api.nvim_win_get_cursor(bufnr)[2],
+        vim.api.nvim_win_get_cursor(0)[1] - 1,
+        vim.api.nvim_win_get_cursor(0)[2],
     }
 
     -- get the first extmark id that comes after the cursor
