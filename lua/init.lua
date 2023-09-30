@@ -1,3 +1,7 @@
+if ANNOTATE_TEST then
+    print('annotate found')
+end
+
 if not ns
 then
     ns = vim.api.nvim_create_namespace('')
