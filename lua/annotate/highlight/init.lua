@@ -1,6 +1,6 @@
 local M = {}
-M.ext = {}
 
+-- @param value: any
 local wrapMaybe = function (value)
     local T = {
         value = nil,
@@ -16,6 +16,14 @@ local wrapMaybe = function (value)
     return T
 end
 
+-- @param obj: table we are testing the existence of 
+--             var against
+--
+-- @param var: string, name of obj parameter we are 
+--             testing the existence of
+--
+-- @param val: value of var parameter if it does not 
+--             exist
 local existing = function (obj, var, val)
     if not obj[var] or obj[var].empty then
         obj[var] = wrapMaybe(val)
@@ -47,13 +55,16 @@ end
 --
 -- Nothing
 M.create_extmark_id = function (id)
-   existing(M.ext, #M.ext + 1, id)
+   existing(M, 'ext', id)
 end
 
 
 M.set_hl = function(range)
-    M.create_ext_mark_id(
-        vim.api.nvim_buf_set_extmark(
+    local bufnr = vim.api.nvim_get_current_buf()
+
+    M.create_namespace('annotate')
+
+    id = vim.api.nvim_buf_set_extmark(
             bufnr,
             M.ns,
             range.start.row,
@@ -64,7 +75,10 @@ M.set_hl = function(range)
                 hl_group='@annotate'
             }
         )
-    )
+
+    print(vim.inspect(id))
+
+    M.create_ext_mark_id(id)
 end
 
 M.get_hl_id = function ()
