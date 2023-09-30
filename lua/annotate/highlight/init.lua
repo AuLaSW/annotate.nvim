@@ -106,7 +106,7 @@ M.get_hl_id = function ()
     -- get the first extmark id that comes after the cursor
     id = vim.api.nvim_buf_get_extmarks(
         bufnr,
-        M.ns,
+        M.ns.value,
         pos,
         {0,0},
         {
