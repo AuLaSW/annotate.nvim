@@ -3,7 +3,7 @@ local test = true
 local v_api = vim.api
 
 local function has_value(tab, val)
-    for _, v in ipairs(tab) do
+    for _, v in pairs(tab) do
         if val == v then
             return true
         end
@@ -14,13 +14,74 @@ end
 
 local function has_key(tab, key)
     for k, _ in pairs(tab) do
-        if val == v then
+        if key == k then
             return true
         end
     end
 
     return false
 end
+
+---Determine if the cursor is between start and stop.
+---@param start Position
+---@param stop Position
+---@param cursor Position
+---@return boolean
+local function cursor_in_range(start, stop, cursor)
+    if (
+        start.row < cursor.row and cursor.row < stop.row
+    ) or (
+        start.row < cursor.row and cursor.row == stop.row and cursor.col <= stop.col
+    ) or (
+        start.row == cursor.row and cursor.row == stop.row and cursor.col >= start.col and cursor.col <= stop.col
+    ) or (
+        start.row == cursor.row and cursor.row < stop.row and cursor.col >= start.col
+    )
+    then
+        return true
+    end
+
+    return false
+end
+
+---@alias namespace number
+---Generate the namespace only if `M` does not already have a
+---namespace attached.
+---@param name string?
+---@return namespace
+local function namespace(name)
+    if not name or type(name) ~= "string" then
+        name = 'annotate_nvim'
+    end
+
+    if not M.ns then
+        return v_api.nvim_create_namespace(name)
+    end
+
+    return M.ns
+end
+
+---@enum index_types
+M.INDEX_TYPES = {
+    none = 0,
+    col = 1,
+    row = 2,
+    row_col = 3,
+}
+
+local DEFAULT_CONFIG = {
+    ns = namespace()
+}
+
+-- a list of nodes
+M.list = {
+    node = {
+        next = nil,
+        value = nil
+    },
+    add = function(node)
+    end,
+}
 
 --[[
 --The monadic structure is as follows:
@@ -35,7 +96,12 @@ end
 --  Run Function
 --]]
 
--- takes a start and stop position and returns a position monad type
+---@alias Position { row: number?, col: number?, range: { row: number, col: number }?, it: index_types, is_complete: boolean? }
+
+---@param row number? row number
+---@param col number? column number
+---@param it index_types? number specifying index type
+---@return Position
 M.wrapPosition = function(row, col, it)
     local T = {
         row = row,
@@ -49,12 +115,12 @@ M.wrapPosition = function(row, col, it)
         is_complete = true,
     }
 
-    if not row or not type(row) == "number" then
+    if not row or type(row) ~= "number" then
         T.row = nil
         T.is_complete = false
     end
-    if not col or not type(col) == "number" then
-        col = nil
+    if not col or type(col) ~= "number" then
+        T.col = nil
         T.is_complete = false
     end
 
@@ -62,46 +128,53 @@ M.wrapPosition = function(row, col, it)
         T.range = nil
     end
 
-    if not it or not has_value({0, 1, 2, 3}, it) then
-        it = nil
+    if not has_value(M.INDEX_TYPES, it) then
+        T.it = nil
     end
 
     return T
 end
 
+---@param row number row number
+---@param col number column number
+---@param old_it index_types current index type of Position object
+---@param new_it index_types new index type of Position object
+---@return number new row number
+---@return number new column number
+---@return index_types new index type
 local function pos_conv(row, col, old_it, new_it)
     local old_to_new_lookup = {
         -- old_it
-        [0] = {
+        [M.INDEX_TYPES.none] = {
             -- new_it
-            [0] = function (in_row, in_col) return in_row, in_col end,
-            [1] = function (in_row, in_col) return in_row, in_col + 1 end,
-            [2] = function (in_row, in_col) return in_row + 1, in_col end,
-            [3] = function (in_row, in_col) return in_row + 1, in_col + 1 end,
+            [M.INDEX_TYPES.none] = function (in_row, in_col) return in_row, in_col end,
+            [M.INDEX_TYPES.col] = function (in_row, in_col) return in_row, in_col + 1 end,
+            [M.INDEX_TYPES.row] = function (in_row, in_col) return in_row + 1, in_col end,
+            [M.INDEX_TYPES.row_col] = function (in_row, in_col) return in_row + 1, in_col + 1 end,
         },
         -- old_it
-        [1] = {
+        [M.INDEX_TYPES.col] = {
             -- new_it
-            [0] = function (in_row, in_col) return in_row, in_col - 1 end,
-            [1] = function (in_row, in_col) return in_row, in_col end,
-            [2] = function (in_row, in_col) return in_row + 1, in_col - 1 end,
-            [3] = function (in_row, in_col) return in_row + 1, in_col end,
+            [M.INDEX_TYPES.none] = function (in_row, in_col) return in_row, in_col - 1 end,
+            [M.INDEX_TYPES.col] = function (in_row, in_col) return in_row, in_col end,
+            [M.INDEX_TYPES.row] = function (in_row, in_col) return in_row + 1, in_col - 1 end,
+            [M.INDEX_TYPES.row_col] = function (in_row, in_col) return in_row + 1, in_col end,
         },
         -- old_it
-        [2] = {
+        [M.INDEX_TYPES.row] = {
             -- new_it
-            [0] = function (in_row, in_col) return in_row - 1, in_col end,
-            [1] = function (in_row, in_col) return in_row - 1, in_col + 1 end,
-            [2] = function (in_row, in_col) return in_row, in_col end,
-            [3] = function (in_row, in_col) return in_row, in_col + 1 end,
+            [M.INDEX_TYPES.none] = function (in_row, in_col) return in_row - 1, in_col end,
+            [M.INDEX_TYPES.col] = function (in_row, in_col) return in_row - 1, in_col + 1 end,
+            [M.INDEX_TYPES.row] = function (in_row, in_col) return in_row, in_col end,
+            [M.INDEX_TYPES.row_col] = function (in_row, in_col) return in_row, in_col + 1 end,
         },
         -- old_it
-        [3] = {
+        [M.INDEX_TYPES.row_col] = {
             -- new_it
-            [0] = function (in_row, in_col) return in_row - 1, in_col - 1 end,
-            [1] = function (in_row, in_col) return in_row - 1, in_col end,
-            [2] = function (in_row, in_col) return in_row, in_col - 1 end,
-            [3] = function (in_row, in_col) return in_row, in_col end,
+            [M.INDEX_TYPES.none] = function (in_row, in_col) return in_row - 1, in_col - 1 end,
+            [M.INDEX_TYPES.col] = function (in_row, in_col) return in_row - 1, in_col end,
+            [M.INDEX_TYPES.row] = function (in_row, in_col) return in_row, in_col - 1 end,
+            [M.INDEX_TYPES.row_col] = function (in_row, in_col) return in_row, in_col end,
         },
     }
 
@@ -110,6 +183,22 @@ local function pos_conv(row, col, old_it, new_it)
     return new_row, new_col, new_it
 end
 
+---Binds a `transform` to a `Position` object and runs the transform. If the position
+---object does not meet certain standards (is not complete), then the transform
+---is not run and the object is returned. The `bindPosition()` function can 
+---automatically handle changing between different row-column index types so long
+---as the new index type is described in the `opts` table as `it`, e.g.:
+---`
+---opts = {
+---   ...,
+---   it = INDEX_TYPES.none,
+---   ...,
+---}
+---`
+---@param pos Position
+---@param transform fun(pos: number, col: number, it: index_types, opts: table): pos: number, col: number, it: index_types
+---@param opts table
+---@return Position
 M.bindPosition = function(pos, transform, opts)
     if not pos.is_complete then
         return pos
@@ -136,13 +225,19 @@ M.bindPosition = function(pos, transform, opts)
 end
 
 
--- @param start: {Position} a Position Monad (created from wrapPosition)
---               for the start of the highlight
+---@alias Highlight {start: Position?, stop: Position?, group: string | '@annotate', id: index_types, bufnr: number?, has_full_position: boolean, is_set: boolean}
 --
--- @param stop:  {Position} a Position Monad (created from wrapPosition)
---               for the end of the highlight
+---@param start Position? a Position Monad for the start of the highlight.
 --
--- @param group: {string} a string describing the highlight group
+---@param stop Position? a Position Monad for the end of the highlight.
+--
+---@param group string? a string describing the highlight group.
+--
+---@param id number? extmark id number.
+--
+---@param bufnr number? the buffer to create the highlight in
+--
+---@return Highlight
 M.wrapHighlight = function(start, stop, group, id, bufnr)
     local T = {
         start = start,
@@ -151,10 +246,11 @@ M.wrapHighlight = function(start, stop, group, id, bufnr)
         id = id,
         bufnr = bufnr,
         has_full_position = true,
-        is_set = true
+        is_set = true,
     }
 
-    if not start.is_complete or not stop.is_complete then
+    -- TODO[DONE]: double-check this set of checks to make sure it is correct
+    if (not start or not start.is_complete) or (not stop or not stop.is_complete) then
         T.has_full_position = false
         T.is_set = false
     end
@@ -177,25 +273,29 @@ M.wrapHighlight = function(start, stop, group, id, bufnr)
         T.is_set = false
     end
 
+    if not T.is_set and T.has_full_position then
+        T.id = v_api.nvim_buf_set_extmark(
+            T.bufnr,
+            M.ns,
+            T.start.row,
+            T.start.col,
+            {
+                end_row = T.stop.row,
+                end_col = T.stop.row,
+                hl_group = T.group
+            }
+        )
+    end
+
     return T
 end
 
+---@param hl Highlight
+--
+---@param transform fun(start: Position, stop: Position, group: string, id: index_types, bufnr: number, opts: table): start: Position?, stop: Position?, group: string?, id: index_types?, bufnr: number?
+-- 
+---@param opts table
 M.bindHighlight = function(hl, transform, opts)
-    if not hl.is_set and hl.has_full_position then
-        local id = v_api.nvim_buf_set_extmark(
-            hl.bufnr,
-            hl.start.row,
-            hl.start.col,
-            {
-                end_row = hl.stop.row,
-                end_col = hl.stop.row,
-                hl_group = hl.group
-            }
-        )
-
-        hl = M.wrapHighlight(hl.start, hl.stop, hl.group, id, hl.bufnr)
-    end
-
     if not hl.has_full_position then
         return hl
     end
@@ -205,146 +305,162 @@ M.bindHighlight = function(hl, transform, opts)
     return M.wrapHighlight(start, stop, group, id, bufnr)
 end
 
--- @param obj: table we are testing the existence of
---             var against.
---
--- @param var: string, name of obj parameter we are
---             testing the existence of.
---
--- @param val: callable that returns a value.
---             Callability is optional; if it is not
---             callable, then the value is wrapped
---             in a function automatically.
-local existing = function(obj, var, val)
-    if not pcall(val) then
-        val = function()
-            return val
+---@param start Position start of highlight
+---@param stop Position end of highlight
+---@param opts table a table of options
+M.set_hl = function(start, stop, opts)
+    local vals = {
+        bufnr = nil,
+        group = nil,
+    }
+
+    for k, v in pairs(opts) do
+        if vals[k] then
+            vals[k] = v
         end
     end
 
-    if not obj[var] or obj[var].empty then
-        obj[var] = wrapMaybe(val())
-    end
+    -- create the highlight in the current buffer
+    local hl = M.wrapHighlight(
+        start,
+        stop,
+        vals.group,
+        nil,
+        vals.bufnr
+    )
+
+    -- TODO: create this list
+    M.list.add(hl)
 end
 
--- Create a namespace for the highlight module. Sets the value into M.ns
--- as a Maybe type.
---
--- ## Arguments:
---
--- name: (string) the name for the namespace
---
--- ## Returns:
---
--- Nothing
-M.create_namespace = function(name)
-    local space = function()
-        return v_api.nvim_create_namespace(name)
-    end
+M.get_hl_at_cursor = function()
+    -- get the cursor position
+    local cursor = M.wrapPosition(
+        v_api.nvim_win_get_cursor(0)[1],
+        v_api.nvim_win_get_cursor(0)[2],
+        M.INDEX_TYPES.row
+    )
 
-    existing(M, 'ns', space)
-end
+    local doc_beg = M.wrapPosition(
+        0,
+        0,
+        M.INDEX_TYPES.none
+    )
 
--- Create an extmark id for the highlight module. Sets the value into M.ext
--- as a Maybe type.
---
--- ## Arguments:
---
--- id: (number) the number for the extmark
---
--- ## Returns:
---
--- Nothing
-M.create_extmark_id = function(id)
-    existing(M, 'ext', id)
-end
-
-
-M.set_hl = function(range)
-    M.create_namespace('annotate')
-    local bufnr = v_api.nvim_get_current_buf()
-
-    local id = v_api.nvim_buf_set_extmark(
-        bufnr,
-        M.ns.value,
-        range.start.row,
-        range.start.col,
+    -- this will dynamically change the position type to match the position type
+    -- of doc_beg
+    cursor = M.bindPosition(
+        cursor,
+        -- in-place identity function
+---@diagnostic disable-next-line: unused-local
+        function (r, c, i, opts)
+            return r, c, i
+        end,
         {
-            end_row = range.stop.row,
-            end_col = range.stop.col,
-            hl_group = '@annotate'
+            it = doc_beg.it
         }
     )
 
-    M.create_extmark_id(id)
-end
-
-M.get_hl_extmarks = function()
-    M.create_namespace('annotate')
-    local bufnr = v_api.nvim_get_current_buf()
-    -- get the cursor position
-    local pos = {
-        v_api.nvim_win_get_cursor(0)[1] - 1,
-        v_api.nvim_win_get_cursor(0)[2],
-    }
-
     -- get the first extmark id that comes after the cursor
-    local ext_id = v_api.nvim_buf_get_extmarks(
-        bufnr,
-        M.ns.value,
-        pos,
-        { 0, 0 },
+    local ext = v_api.nvim_buf_get_extmarks(
+        0,
+        M.ns,
+        cursor.range,
+        doc_beg.range,
         {
             details = true,
             limit = 1
         }
     )[1]
 
+    local hl_begin = M.wrapPosition(
+        ext[2],
+        ext[3],
+        M.INDEX_TYPES.none
+    )
+
+    local hl_end = M.wrapPosition(
+        ext[4].end_row,
+        ext[4].end_col,
+        M.INDEX_TYPES.col
+    )
+
+    local hl = M.wrapHighlight(
+        hl_begin,
+        hl_end,
+        ext[4].hl_group,
+        ext[1],
+        0
+    )
+
     -- check that the id ends after the cursor
-    -- if it is, then return it
-    -- otherwise, return nil
-    if ext_id[4].end_row > pos[1] or (
-            ext_id[4].end_row == pos[1] and
-            ext_id[4].end_col >= pos[2]
-        ) then
-        return ext_id
+    -- if it is, then return the associated highlight
+    if cursor_in_range(hl_begin, hl_end, cursor) then
+        return hl
     end
 
-    return nil
+    -- return an empty highlight
+    return M.wrapHighlight()
 end
 
-M.del_hl_id = function(id)
-    local bufnr = v_api.nvim_get_current_buf()
+M.del_hl_at_cursor = function ()
+    local hl = M.get_hl_at_cursor()
 
-    print(bufnr, M.ns.value, id)
+    M.bindHighlight(
+        hl,
+        function (start, stop, group, id, bufnr, opts)
+            v_api.nvim_buf_del_extmark(
+                bufnr,
+                M.ns,
+                id
+            )
+
+            return nil, nil, nil, nil, nil
+        end,
+        {}
+    )
+end
+
+--[[
+M.del_hl_id = function(id)
     v_api.nvim_buf_del_extmark(
         bufnr,
         M.ns.value,
         id
     )
-
-    M.ext = nil
 end
+--]]
 
-M.setup = function(opts)
+M.setup = function(config)
+    if not config or type(config) ~= "table" then
+        config = DEFAULT_CONFIG
+    end
+    M.ns = config.ns
 end
 
 if test then
-    M.set_hl({
-        start = {
-            row = 0,
-            col = 0
-        },
-        stop = {
-            row = 2,
-            col = 0
-        }
-    })
+    M.setup()
+    local start = M.wrapPosition(
+        0,
+        0,
+        M.INDEX_TYPES.none
+    )
 
-    local id = M.get_hl_extmarks()
-    print(id)
+    local stop = M.wrapPosition(
+        1,
+        0,
+        M.INDEX_TYPES.none
+    )
 
-    M.del_hl_id(id[1])
+    M.set_hl(
+        start,
+        stop,
+        {}
+    )
+
+    M.get_hl_at_cursor()
+
+    M.del_hl_at_cursor()
 end
 
 return M
