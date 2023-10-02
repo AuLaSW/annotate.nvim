@@ -1,6 +1,8 @@
 local posit = require('annotate.utils.position')
 
 local M = {}
+M.opts = {}
+
 local test = true
 local v_api = vim.api
 
@@ -36,17 +38,14 @@ local function namespace(name)
         name = 'annotate_nvim'
     end
 
-    if not M.ns then
+    if not M.opts.ns then
         return v_api.nvim_create_namespace(name)
     end
 
-    return M.ns
+    return M.opts.ns
 end
 
-
-local DEFAULT_CONFIG = {
-    ns = namespace()
-}
+M.opts.ns = namespace()
 
 -- a list of nodes
 M.list = {
@@ -104,12 +103,12 @@ M.wrapHighlight = function(start, stop, group, id, bufnr)
     if not T.is_set and T.has_full_position then
         T.id = v_api.nvim_buf_set_extmark(
             T.bufnr,
-            M.ns,
+            M.opts.ns,
             T.start.row,
             T.start.col,
             {
                 end_row = T.stop.row,
-                end_col = T.stop.row,
+                end_col = T.stop.col,
                 hl_group = T.group
             }
         )
@@ -192,7 +191,7 @@ M.get_hl_at_cursor = function()
     -- get the first extmark id that comes after the cursor
     local ext = v_api.nvim_buf_get_extmarks(
         0,
-        M.ns,
+        M.opts.ns,
         cursor.range,
         doc_beg.range,
         {
@@ -239,7 +238,7 @@ M.del_hl_at_cursor = function ()
         function (start, stop, group, id, bufnr, opts)
             v_api.nvim_buf_del_extmark(
                 bufnr,
-                M.ns,
+                M.opts.ns,
                 id
             )
 
@@ -249,11 +248,15 @@ M.del_hl_at_cursor = function ()
     )
 end
 
-M.setup = function(config)
-    if not config or type(config) ~= "table" then
-        config = DEFAULT_CONFIG
+M.setup = function(opts)
+    --[[
+    if not opts or type(opts) ~= "table" then
+        opts = DEFAULT_CONFIG
     end
-    M.ns = config.ns
+    M.ns = opts.ns
+    --]]
+    -- a better way to combine tables in lua
+    M.opts = vim.tbl_deep_extend("force", M.opts, opts or {})
 end
 
 if test then
@@ -279,8 +282,8 @@ if test then
     M.get_hl_at_cursor()
     print('Creating highlight...')
 
-    M.del_hl_at_cursor()
-    print('Deleting highlight...')
+    --M.del_hl_at_cursor()
+    --print('Deleting highlight...')
 end
 
 return M
