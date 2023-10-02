@@ -1,3 +1,4 @@
+---@meta
 local M = {}
 
 ---Returns true if the table contains the specified value

@@ -1,4 +1,5 @@
 local posit = require('annotate.utils.position')
+
 local M = {}
 local test = true
 local v_api = vim.api
@@ -58,17 +59,12 @@ M.list = {
 }
 
 ---@alias Highlight {start: Position?, stop: Position?, group: string | '@annotate', id: index_types, bufnr: number?, has_full_position: boolean, is_set: boolean}
---
+
 ---@param start Position? a Position Monad for the start of the highlight.
---
 ---@param stop Position? a Position Monad for the end of the highlight.
---
 ---@param group string? a string describing the highlight group.
---
 ---@param id number? extmark id number.
---
 ---@param bufnr number? the buffer to create the highlight in
---
 ---@return Highlight
 M.wrapHighlight = function(start, stop, group, id, bufnr)
     local T = {

@@ -1,3 +1,4 @@
+---@meta
 local basic = require('annotate.utils.basic')
 local M = {}
 
