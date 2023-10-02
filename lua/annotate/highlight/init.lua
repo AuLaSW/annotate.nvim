@@ -83,19 +83,6 @@ M.list = {
     end,
 }
 
---[[
---The monadic structure is as follows:
---  Wrapper Type:
---      The wrapper type is Highlight, which contains information regarding
---      the position of the highlight and the highlight group associated
---      with the highlight.
---  Wrapper
---      The wrapper is wrapHighlight(). Will require the highlight group and
---      the position in order to generate the type, though the two values
---      can be empty.
---  Run Function
---]]
-
 ---@alias Position { row: number?, col: number?, range: { row: number, col: number }?, it: index_types, is_complete: boolean? }
 
 ---@param row number? row number
@@ -420,16 +407,6 @@ M.del_hl_at_cursor = function ()
         {}
     )
 end
-
---[[
-M.del_hl_id = function(id)
-    v_api.nvim_buf_del_extmark(
-        bufnr,
-        M.ns.value,
-        id
-    )
-end
---]]
 
 M.setup = function(config)
     if not config or type(config) ~= "table" then
