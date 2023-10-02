@@ -1,4 +1,5 @@
 local posit = require('annotate.utils.position')
+local list = require('annotate.utils.list')
 
 local M = {}
 M.opts = {}
