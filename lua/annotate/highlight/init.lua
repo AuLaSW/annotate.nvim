@@ -1,5 +1,5 @@
 local posit = require('annotate.utils.position')
-local list = require('annotate.utils.list')
+--local list = require('annotate.utils.list')
 
 local M = {}
 M.opts = {}
@@ -213,18 +213,18 @@ M.get_hl_at_cursor = function()
         posit.INDEX_TYPES.col
     )
 
-    local hl = M.wrapHighlight(
-        hl_begin,
-        hl_end,
-        ext[4].hl_group,
-        ext[1],
-        0
-    )
 
     -- check that the id ends after the cursor
     -- if it is, then return the associated highlight
     if position_in_range(hl_begin, hl_end, cursor) then
-        return hl
+        return M.wrapHighlight(
+            hl_begin,
+            hl_end,
+            ext[4].hl_group,
+            ext[1],
+            0
+        )
+
     end
 
     -- return an empty highlight
